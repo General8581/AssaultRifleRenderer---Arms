@@ -1,0 +1,232 @@
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.general_85.warmachines.item.GunItem;
+import net.general_85.warmachines.item.MagazineItem;
+import net.general_85.warmachines.item.client.model.TwoHandedGunModel;
+import net.general_85.warmachines.util.magazines.CompatibleMagazinesItemToString;
+import net.general_85.warmachines.util.magazines.CompatibleMagazinesStringToItem;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
+import software.bernie.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.util.RenderUtils;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+public class AssaultRifleRenderer extends GeoItemRenderer<GunItem> {
+
+    public AssaultRifleRenderer() {
+        super(new TwoHandedGunModel());
+
+    }
+
+    @Override
+    public void preRender(PoseStack poseStack, GunItem gunItem, BakedGeoModel model, MultiBufferSource bufferSource, VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
+
+
+        if (renderPerspective.firstPerson()){
+
+        //    model.getBone("right_arm").get().setHidden(false);
+        //    model.getBone("left_arm").get().setHidden(false);
+
+            Player player = Minecraft.getInstance().player;
+            assert player != null;
+            ItemStack heldItem = player.getMainHandItem();
+            CompoundTag compoundTag = heldItem.getOrCreateTag();
+
+            if (compoundTag.getBoolean("isAimingDefault")){
+
+                model.getBone("whole").get().setPosX(gunItem.getAdsXPos());
+                model.getBone("whole").get().setPosY(gunItem.getAdsYPos()); //0.25
+                model.getBone("whole").get().setPosZ(gunItem.getAdsZPos());
+
+                //  model.getBone("main").get().setRotX(2);
+
+            } else {
+
+                model.getBone("gun").get().resetStateChanges();
+
+            }
+        } else {
+       //     model.getBone("right_arm").get().setHidden(true);
+       //     model.getBone("left_arm").get().setHidden(true);
+        }
+
+
+
+        Player player = Minecraft.getInstance().player;
+        assert player != null;
+        ItemStack heldItem = player.getMainHandItem();
+        CompoundTag tag = heldItem.getOrCreateTag();
+
+        CompatibleMagazinesStringToItem compatibleMagazinesStringToItemMap = new CompatibleMagazinesStringToItem();
+
+        MagazineItem currentMagazineType = (MagazineItem) animatable.getCurrentMagazine();
+        String identifierTag = tag.getString("currentMagazine");
+
+        if (!tag.getBoolean("magIsHidden")) {
+
+            for (Item compatibleMagazine : animatable.getCompatibleMagazines()) {
+                MagazineItem magazineItem = (MagazineItem) compatibleMagazine;
+                String boneName = magazineItem.getModelIdentifierTag();
+
+                boolean showBone = boneName.equals(identifierTag);
+                model.getBone(boneName).ifPresent(bone -> bone.setHidden(!showBone));
+            }
+        } else {
+
+            for (Item compatibleMagazine : animatable.getCompatibleMagazines()) {
+                MagazineItem magazineItem = (MagazineItem) compatibleMagazine;
+                String boneName = magazineItem.getModelIdentifierTag();
+                model.getBone(boneName).ifPresent(bone -> bone.setHidden(true));
+            }
+        }
+
+
+        super.preRender(poseStack, gunItem, model, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, red, green, blue, alpha);
+    }
+
+
+
+//I hate this damn thing so much
+    @Override
+    public void renderRecursively(PoseStack poseStack, GunItem animatable, GeoBone bone, RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
+
+
+
+      //  this.vertexConsumer = buffer;
+     //   this.multiBufferSource = bufferSource;
+
+
+        Minecraft mc = Minecraft.getInstance();
+
+        boolean renderArms = false;
+
+        switch (bone.getName()) {
+            case "left_arm", "right_arm" -> {
+                bone.setHidden(true);
+                bone.setChildrenHidden(false);
+                renderArms = true;
+            }
+        }
+
+// && renderPerspective.firstPerson()
+
+        if (renderArms && renderPerspective.firstPerson()){
+
+
+            //   if (){
+
+
+            assert mc.player != null;
+            PlayerRenderer playerRenderer = (PlayerRenderer) mc.getEntityRenderDispatcher().getRenderer(mc.player);
+            PlayerModel<AbstractClientPlayer> playerModel = playerRenderer.getModel();
+
+
+            poseStack.pushPose();
+
+            RenderUtils.translateMatrixToBone(poseStack, bone);
+           // RenderUtils.translateAndRotateMatrixForBone(poseStack, bone);
+            RenderUtils.translateToPivotPoint(poseStack, bone);
+            RenderUtils.rotateMatrixAroundBone(poseStack, bone);
+
+            RenderUtils.scaleMatrixForBone(poseStack, bone);
+            RenderUtils.translateAwayFromPivotPoint(poseStack, bone);
+
+            assert (mc.player != null);
+
+            ResourceLocation playerSkin = mc.player.getSkinTextureLocation();
+            VertexConsumer arm = bufferSource.getBuffer(RenderType.entitySolid(playerSkin));
+            VertexConsumer sleeve = bufferSource.getBuffer(RenderType.entityTranslucent(playerSkin));
+         //   poseStack.scale(bone.getScaleX(), bone.getScaleY(), bone.getScaleZ());
+        //    poseStack.translate(-0.25, -0.43625, 0.1625);
+
+
+
+            if (bone.getName().equals("left_arm")){
+
+                bone.setPivotX(bone.getPivotX());
+                bone.setPivotY(bone.getPivotY());
+                bone.setPivotZ(bone.getPivotZ());
+
+                float correctXRot = (float) Math.toRadians (90);
+                float correctYRot = (float) Math.toRadians (15);
+                float correctZRot = (float) Math.toRadians (90);
+
+                playerModel.leftArm.setRotation(bone.getRotX() - correctXRot, bone.getRotY() + correctYRot, bone.getRotZ() + correctZRot);
+              //  playerModel.leftArm.setRotation((float) Math.toRadians(bone.getRotX()), (float) Math.toRadians(bone.getRotY()), (float) Math.toRadians(bone.getRotZ()));
+                playerModel.leftArm.setPos(bone.getPosX(), bone.getPosY() + 9, bone.getPosZ() + 7);
+             //   playerModel.leftArm.xScale = 1.25f;
+             //   playerModel.leftArm.yScale = 1.5f;
+             //   playerModel.leftArm.zScale = 1.25f;
+
+                playerModel.leftArm.render(poseStack, arm, packedLight, packedOverlay, 1, 1, 1, 1);
+
+                playerModel.leftSleeve.setRotation(bone.getRotX() - correctXRot, bone.getRotY() + correctYRot, bone.getRotZ() + correctZRot);
+              //  playerModel.leftSleeve.setRotation((float) Math.toRadians(bone.getRotX()), (float) Math.toRadians(bone.getRotY()), (float) Math.toRadians(bone.getRotZ()));
+                playerModel.leftSleeve.setPos(bone.getPosX(), bone.getPosY() + 9, bone.getPosZ() + 7);
+
+              //  playerModel.leftSleeve.xScale = 1.25f;
+              //  playerModel.leftSleeve.yScale = 1.5f;
+              //  playerModel.leftSleeve.zScale = 1.25f;
+                playerModel.leftSleeve.render(poseStack, sleeve, packedLight, packedOverlay, 1, 1, 1, 1);
+
+
+            } else if (bone.getName().equals("right_arm")) {
+
+                bone.setPivotX(bone.getPivotX());
+                bone.setPivotY(bone.getPivotY());
+                bone.setPivotZ(bone.getPivotZ());
+
+
+                float correctXRot = (float) Math.toRadians (90);
+                float correctYRot = (float) Math.toRadians (0);
+                float correctZRot = (float) Math.toRadians (90);
+
+             //   bone.setPivotX(bone.getPivotX());
+            //    bone.setPivotY(bone.getPivotY());
+               // bone.setPivotZ(bone.getPivotZ());
+
+                playerModel.rightArm.setRotation(bone.getRotX() - correctXRot, bone.getRotY() + correctYRot, bone.getRotZ() + correctZRot);
+                playerModel.rightArm.setPos(bone.getPosX(), bone.getPosY() + 5.5f, bone.getPosZ() + 22);
+
+             //   playerModel.rightArm.xScale = 1.25f;
+             //   playerModel.rightArm.yScale = 1.5f;
+             //   playerModel.rightArm.zScale = 1.25f;
+                playerModel.rightArm.render(poseStack, arm, packedLight, packedOverlay, 1, 1, 1, 1);
+
+                playerModel.rightSleeve.setRotation(bone.getRotX() - correctXRot, bone.getRotY() + correctYRot, bone.getRotZ() + correctZRot);
+                playerModel.rightSleeve.setPos(bone.getPosX(), bone.getPosY() + 5.5f, bone.getPosZ() + 22);
+
+              //  playerModel.rightSleeve.xScale = 1.25f;
+              //  playerModel.rightSleeve.yScale = 1.5f;
+              //  playerModel.rightSleeve.zScale = 1.25f;
+                playerModel.rightSleeve.render(poseStack, sleeve, packedLight, packedOverlay, 1, 1, 1, 1);
+
+            }
+            poseStack.popPose();
+
+
+        }
+
+
+
+            super.renderRecursively(poseStack, animatable, bone, renderType, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, red, green, blue, alpha);
+    }
+
+
+}
